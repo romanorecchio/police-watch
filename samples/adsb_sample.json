@@ -1,0 +1,47 @@
+{
+  "ac": [
+    {
+      "hex": "a97a71",
+      "flight": "N71HP  ",
+      "r": "N71HP",
+      "t": "AS50",
+      "alt_baro": 1800,
+      "gs": 95,
+      "track": 210,
+      "lat": 40.45,
+      "lon": -80.61,
+      "ownOp": "OHIO DEPARTMENT OF PUBLIC SAFETY",
+      "category": "A7",
+      "type": "adsb_icao"
+    },
+    {
+      "hex": "acc5aa",
+      "flight": "DAL2331 ",
+      "r": "N922AT",
+      "t": "B712",
+      "alt_baro": 30000,
+      "gs": 420,
+      "track": 296,
+      "lat": 40.5,
+      "lon": -80.7,
+      "ownOp": "DELTA AIR LINES INC",
+      "category": "A3",
+      "type": "adsb_icao"
+    },
+    {
+      "hex": "abcdef",
+      "flight": "POLICE1 ",
+      "r": "N9TEST",
+      "t": "B407",
+      "alt_baro": 900,
+      "gs": 70,
+      "track": 12,
+      "lat": 40.43,
+      "lon": -80.58,
+      "category": "A7",
+      "type": "adsb_icao"
+    }
+  ],
+  "msg": "No error",
+  "total": 3
+}

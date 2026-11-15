@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1220">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Police Watch">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="description" content="Free local PWA: spoken alerts for police aircraft, Waze police reports, and OSM speed / red-light / Flock ALPR cameras.">
+  <title>Police Watch</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Police Watch</h1>
+      <button type="button" id="settings-toggle" class="ghost">Settings</button>
+    </header>
+    <div id="map" role="application" aria-label="Map of cameras, aircraft, and police reports"></div>
+    <video id="keepawake-video" src="media/keepawake.mp4" muted loop playsinline webkit-playsinline preload="auto" aria-hidden="true"></video>
+    <div id="dock">
+      <p id="install-hint">On iPhone: tap the Share button, then <strong>Add to Home Screen</strong>. Open it from the Home Screen, tap <strong>Start Driving</strong>, allow location, and turn the ringer on. Voice only works while this app is in the foreground — lock the phone or switch apps and call-outs stop.</p>
+      <div id="controls">
+        <button type="button" id="start-btn">Start Driving</button>
+        <button type="button" id="stop-btn" hidden>Stop</button>
+      </div>
+      <div id="counts">
+        <span>LE aircraft <strong id="count-aircraft">0</strong>/<strong id="count-all-aircraft">0</strong></span>
+        <span>Waze police <strong id="count-waze">0</strong></span>
+        <span>Cameras <strong id="count-cameras">0</strong></span>
+      </div>
+      <div class="legend">
+        <span><i style="background:#facc15"></i> Police aircraft</span>
+        <span><i style="background:#a78bfa"></i> Waze police</span>
+        <span><i style="background:#f59e0b"></i> Flock / ALPR</span>
+        <span><i style="background:#fb7185"></i> Speed / red-light</span>
+        <span><i style="background:#0ea5e9"></i> You</span>
+      </div>
+      <div id="fix-info" class="pill">Location not started</div>
+      <section id="settings-panel">
+        <form id="settings-form">
+          <label><input type="checkbox" id="voice-toggle"> Voice call-outs</label>
+          <label><input type="checkbox" id="gps-toggle" checked> Use phone GPS</label>
+          <div class="row">
+            <label>Aircraft radius (nm)
+              <input type="number" id="radius-nm" min="3" max="50" step="1" value="15">
+            </label>
+            <label>Camera alert (miles ahead)
+              <input type="number" id="camera-miles" min="0.1" max="3" step="0.1" value="0.6">
+            </label>
+          </div>
+          <label>Waze police alert (miles ahead)
+            <input type="number" id="waze-miles" min="0.2" max="5" step="0.1" value="1">
+          </label>
+          <label>City or place
+            <input type="text" id="city" placeholder="Weirton, WV" autocomplete="address-level2">
+          </label>
+          <button type="button" id="lookup-city" class="ghost">Set location from city</button>
+          <div class="row">
+            <label>Latitude <input type="number" id="lat" step="0.00001"></label>
+            <label>Longitude <input type="number" id="lon" step="0.00001"></label>
+          </div>
+          <label>Optional proxy URL (for aircraft + Waze if CORS blocks them)
+            <input type="url" id="proxy-base" placeholder="https://example.workers.dev">
+          </label>
+        </form>
+      </section>
+      <ul id="status-list">
+        <li id="status-boot"></li>
+        <li id="status-gps"></li>
+        <li id="status-wake"></li>
+        <li id="status-registry"></li>
+        <li id="status-adsb"></li>
+        <li id="status-waze"></li>
+        <li id="status-cameras"></li>
+      </ul>
+      <ul id="alert-log" aria-live="polite"></ul>
+      <p class="disclaimer">
+        Read-only public data: FAA aircraft registrations, community ADS-B, OpenStreetMap (including DeFlock-style ALPR tags), and Waze’s public live map when reachable.
+        Many police aircraft do not broadcast ADS-B. Camera and Waze data can be incomplete or wrong. Circling is only a guess.
+        This does not interfere with any equipment. Watch the road; do not handle the phone while driving.
+      </p>
+    </div>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    // Leaflet 1.9.4 integrity may fail if the CDN file changes; fall back without integrity.
+    window.addEventListener("error", function (e) {
+      if (e.target && e.target.src && e.target.src.indexOf("leaflet") !== -1 && !window.L) {
+        var s = document.createElement("script");
+        s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        document.body.appendChild(s);
+      }
+    }, true);
+  </script>
+  <script type="module" src="js/app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(function () {});
+    }
+  </script>
+</body>
+</html>

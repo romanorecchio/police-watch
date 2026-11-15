@@ -1,0 +1,53 @@
+{
+  "elements": [
+    {
+      "type": "node",
+      "id": 1,
+      "lat": 40.421,
+      "lon": -80.591,
+      "tags": {
+        "man_made": "surveillance",
+        "surveillance:type": "ALPR",
+        "manufacturer": "Flock Safety"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2,
+      "lat": 40.43,
+      "lon": -80.58,
+      "tags": {
+        "man_made": "surveillance",
+        "surveillance:type": "ALPR",
+        "operator": "City"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3,
+      "lat": 40.418,
+      "lon": -80.6,
+      "tags": {
+        "highway": "speed_camera"
+      }
+    },
+    {
+      "type": "node",
+      "id": 4,
+      "lat": 40.415,
+      "lon": -80.605,
+      "tags": {
+        "enforcement": "traffic_signals"
+      }
+    },
+    {
+      "type": "node",
+      "id": 5,
+      "lat": 41.0,
+      "lon": -81.0,
+      "tags": {
+        "amenity": "bench"
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "alerts": [
+    {
+      "uuid": "waze-1",
+      "type": "POLICE",
+      "subtype": "POLICE_VISIBLE",
+      "location": {
+        "x": -80.589,
+        "y": 40.425
+      },
+      "street": "Main St",
+      "city": "Weirton",
+      "pubMillis": 1730000000000
+    },
+    {
+      "uuid": "waze-2",
+      "type": "HAZARD",
+      "subtype": "HAZARD_ON_ROAD",
+      "location": {
+        "x": -80.59,
+        "y": 40.42
+      },
+      "street": "US 22"
+    },
+    {
+      "id": "waze-3",
+      "type": "POLICE",
+      "lat": 40.41,
+      "lon": -80.55,
+      "street": "State Hwy 2"
+    }
+  ]
+}
