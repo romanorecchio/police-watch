@@ -24,3 +24,7 @@ Tuned for iOS Safari / Add to Home Screen:
 - Speech resume timer for the iOS pause bug; voices prefer Samantha/Siri/en-US.
 - Wake Lock API (iOS 16.4+) with muted looping `media/keepawake.mp4` fallback. Documented Auto-Lock limitation.
 - Layout aimed at iPhone SE / 14 / Pro Max widths; Start button 56px full width; 16px inputs to avoid focus-zoom.
+
+## 2026-11-15 13:51 EST — Published
+GitHub Pages is live at https://romanorecchio.github.io/police-watch/ (HTTPS, status built).
+Repo: https://github.com/romanorecchio/police-watch
