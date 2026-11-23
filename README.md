@@ -44,9 +44,9 @@ Alerts are heading-aware when you are moving, and each target has a cooldown so 
 | Data | Source | Browser notes |
 | --- | --- | --- |
 | Police / LE aircraft list | Public [FAA Releasable Aircraft Database](https://registry.faa.gov/database/ReleasableAircraft.zip), owners matching POLICE, SHERIFF, STATE / HIGHWAY PATROL, STATE POLICE, LAW ENFORCEMENT, PUBLIC SAFETY, plus federal names (CBP, FBI, DHS, etc.) | Bundled as `data/police_aircraft.json` |
-| Live aircraft | [airplanes.live](https://api.airplanes.live/v2/point/{lat}/{lon}/{radius_nm}), then [adsb.lol](https://api.adsb.lol/v2/point/...), then [adsb.fi](https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/{nm}) | **No CORS** from GitHub Pages. Needs the optional free proxy. |
+| Live aircraft | [airplanes.live](https://api.airplanes.live/v2/point/{lat}/{lon}/{radius_nm}), then [adsb.lol](https://api.adsb.lol/v2/point/...), then [adsb.fi](https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/{nm}) | **No CORS** from GitHub Pages. Uses the built-in Cloudflare Worker proxy. |
 | Speed / red-light / Flock ALPR | OpenStreetMap Overpass (`surveillance:type=ALPR`, `highway=speed_camera`, enforcement relations). Same tags DeFlock uses. | **CORS is allowed** (`Access-Control-Allow-Origin: *`). |
-| Waze police reports | Public live-map endpoint `https://www.waze.com/live-map/api/georss?...&types=alerts`, filtered to `type=POLICE`. Polled every 90 seconds, never faster than 60s. | Often **CORS-blocked** and sometimes **403 from datacenter IPs**. Needs the optional proxy, and even then Waze may refuse the server. |
+| Waze police reports | Public live-map endpoint `https://www.waze.com/live-map/api/georss?...&types=alerts`, filtered to `type=POLICE`. Polled every 90 seconds, never faster than 60s. | Often **CORS-blocked** and sometimes **403 from datacenter IPs**. Uses the built-in proxy; Waze may still refuse the Worker IP. |
 
 The app ships a bundled OSM camera cache for the Weirton / Pittsburgh / Wheeling area and refreshes live when Overpass is reachable.
 
@@ -70,21 +70,17 @@ A registration on this list means the FAA owner name looks like a law-enforcemen
 - This app only **reads** public data. It does not interfere with any aircraft, camera, or law-enforcement equipment.
 - **Do not handle the phone while driving.** Mount it, start the app before you move, and watch the road.
 
-## Aircraft and Waze without a proxy
+## Aircraft and Waze proxy
 
 From a phone browser, Overpass (cameras) works. The ADS-B APIs and Waze do **not** send `Access-Control-Allow-Origin`, so Safari cannot read them directly from GitHub Pages.
 
-A tiny Cloudflare Worker (free plan, no card required) is in `worker/`. It needs a one-time Cloudflare login, which this project does not have:
+A Cloudflare Worker (free plan, no card) is deployed at:
 
-```bash
-cd worker
-npx wrangler login
-npx wrangler deploy
-```
+`https://police-watch-proxy.policewatch.workers.dev`
 
-Then paste the `*.workers.dev` URL into **Settings → Optional proxy URL**. After that, aircraft and (if Waze allows the worker’s IP) police reports can load.
+The app uses that URL by default, so you do not need to paste anything in Settings. You can still override it under **Settings → Proxy URL**. Source for the Worker is in `worker/`.
 
-Until a proxy is deployed, you still get GPS, the map, bundled + live OSM cameras, and spoken camera call-outs.
+The Worker adds the CORS headers the app needs. Upstream feeds can still refuse Cloudflare IPs: as of 23 Nov 2026, Waze returned **403** through the Worker, and the ADS-B fallbacks were **403** (airplanes.live, adsb.fi) or **429** (adsb.lol). Camera call-outs do not depend on this proxy.
 
 ## Run it locally (Mac or any computer)
 

@@ -1,7 +1,7 @@
 import { haversineMiles, bearingDegrees, cardinal, formatMiles, bboxFromPoint, nmToMiles } from "./geo.js";
 import { buildRegistryIndex, classifyAircraft, updateCircling } from "./classify.js";
 import { evaluateAlerts, markSpoken, DEFAULTS, mphFromMps } from "./alerts.js";
-import { fetchAircraftLive, fetchWazePolice, fetchCameras } from "./sources.js";
+import { fetchAircraftLive, fetchWazePolice, fetchCameras, DEFAULT_PROXY_BASE } from "./sources.js";
 import { createSpeaker } from "./speech.js";
 
 const DEFAULT_CENTER = { lat: 40.42, lon: -80.59, label: "Weirton / Steubenville" };
@@ -237,7 +237,8 @@ async function pollAircraft() {
   if (res.source) {
     setStatus("adsb", `${classified.length} aircraft (${le.length} matched LE list) via ${res.source}`);
   } else {
-    setStatus("adsb", "Aircraft feed blocked in the browser (ADS-B APIs have no CORS). Add a free proxy URL in Settings to enable it.");
+    const detail = (res.errors || []).join("; ");
+    setStatus("adsb", detail ? `Aircraft feed failed (${detail}).` : "Aircraft feed unavailable.");
   }
   refreshMarkers();
   tickAlerts();
@@ -248,7 +249,10 @@ async function pollWaze() {
   const res = await fetchWazePolice(bbox, { proxyBase: settings.proxyBase });
   latest.waze = res.alerts;
   if (res.source) setStatus("waze", `${res.alerts.length} police reports via ${res.source}`);
-  else setStatus("waze", "Waze police feed blocked in the browser (no CORS, and some networks get 403). Add a free proxy URL in Settings to try it.");
+  else {
+    const detail = (res.errors || []).join("; ");
+    setStatus("waze", detail ? `Waze police feed failed (${detail}).` : "Waze police feed unavailable.");
+  }
   refreshMarkers();
   tickAlerts();
 }
@@ -463,7 +467,7 @@ function fillForm() {
   $("radius-nm").value = settings.aircraftRadiusNm;
   $("camera-miles").value = settings.cameraAheadMiles;
   $("waze-miles").value = settings.wazeAheadMiles;
-  $("proxy-base").value = settings.proxyBase || "";
+  $("proxy-base").value = settings.proxyBase || DEFAULT_PROXY_BASE;
   $("lat").value = Number(settings.lat).toFixed(5);
   $("lon").value = Number(settings.lon).toFixed(5);
   $("city").value = settings.city || "";

@@ -1,4 +1,4 @@
-const CACHE = "police-watch-v2";
+const CACHE = "police-watch-v3";
 const PRECACHE = [
   "./",
   "./index.html",

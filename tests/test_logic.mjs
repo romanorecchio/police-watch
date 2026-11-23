@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { haversineMiles, bearingDegrees, isAhead, formatMiles, headingDelta, cardinal, bboxFromPoint } from "../js/geo.js";
 import { buildRegistryIndex, classifyAircraft, updateCircling, ownerLooksLawEnforcement } from "../js/classify.js";
-import { parseAdsbResponse, parseWazeResponse, parseOverpassResponse } from "../js/sources.js";
+import { parseAdsbResponse, parseWazeResponse, parseOverpassResponse, DEFAULT_PROXY_BASE, resolveProxyBase } from "../js/sources.js";
 import { evaluateAlerts, markSpoken, DEFAULTS } from "../js/alerts.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -150,4 +150,13 @@ test("does not fabricate a police match for a random airliner in live-shaped dat
   const ac = parseAdsbResponse(sampleAdsb).find((a) => a.r === "N922AT");
   const result = classifyAircraft(ac, index);
   assert.equal(result.match, null);
+});
+
+test("built-in proxy URL is used unless Settings overrides it", () => {
+  assert.equal(DEFAULT_PROXY_BASE, "https://police-watch-proxy.policewatch.workers.dev");
+  assert.equal(resolveProxyBase(""), DEFAULT_PROXY_BASE);
+  assert.equal(resolveProxyBase("  "), DEFAULT_PROXY_BASE);
+  assert.equal(resolveProxyBase(null), DEFAULT_PROXY_BASE);
+  assert.equal(resolveProxyBase(undefined), DEFAULT_PROXY_BASE);
+  assert.equal(resolveProxyBase("https://custom.example/proxy/"), "https://custom.example/proxy");
 });

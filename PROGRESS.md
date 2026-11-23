@@ -28,3 +28,12 @@ Tuned for iOS Safari / Add to Home Screen:
 ## 2026-11-15 13:51 EST — Published
 GitHub Pages is live at https://romanorecchio.github.io/police-watch/ (HTTPS, status built).
 Repo: https://github.com/romanorecchio/police-watch
+
+## 2026-11-23 00:53 EST — Cloudflare Worker deployed
+- New free Cloudflare account (Bernard, `1qjyafsb@mail.grokbot.com`). workers.dev subdomain `policewatch` registered. Email verification was required (error 10034) before the first successful deploy.
+- Deployed `police-watch-proxy` (version `42c60c97-cb3c-467e-956f-3c0677df697c`) at **https://police-watch-proxy.policewatch.workers.dev**. No card or paid plan.
+- From the box, with `Origin: https://romanorecchio.github.io`:
+  - `/health` **200**, CORS `Access-Control-Allow-Origin: https://romanorecchio.github.io`. OPTIONS preflight **204** with the same CORS headers.
+  - `/adsb?lat=40.42&lon=-80.59&radius=15` **502**: `airplanes.live` HTTP 403, `adsb.lol` HTTP 429, `adsb.fi` HTTP 403. **0 aircraft**, so **0 FAA police matches**. Same errors at 50 nm. Not fabricated. (Direct from the box, `adsb.lol` and `adsb.fi` returned 200 with **0** aircraft around 00:52 EST — a quiet night — while the Worker IP was blocked or rate-limited.)
+  - `/waze` **403** (`{"error":"Waze HTTP 403","alerts":[]}`). Waze also 403s from this datacenter directly. CORS headers were still present.
+- The app now uses that Worker URL as the **default proxy**. Settings can still override it. Service worker cache bumped to `police-watch-v3`.

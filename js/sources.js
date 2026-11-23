@@ -1,5 +1,14 @@
 /** Parse public ADS-B, Waze, and Overpass responses. Fetch helpers are browser-safe. */
 
+export const DEFAULT_PROXY_BASE = "https://police-watch-proxy.policewatch.workers.dev";
+
+/** Empty/missing values fall back to the built-in Worker. A non-empty value overrides it. */
+export function resolveProxyBase(proxyBase) {
+  const value = (proxyBase == null ? "" : String(proxyBase)).trim();
+  return (value || DEFAULT_PROXY_BASE).replace(/\/$/, "");
+}
+
+
 export function parseAdsbResponse(data) {
   if (!data || typeof data !== "object") return [];
   const list = data.ac || data.aircraft || data.states || [];
@@ -219,7 +228,7 @@ export async function fetchJson(url, options = {}) {
 
 export async function fetchAircraftLive(lat, lon, radiusNm, options = {}) {
   const errors = [];
-  const proxy = (options.proxyBase || "").replace(/\/$/, "");
+  const proxy = resolveProxyBase(options.proxyBase);
   if (proxy) {
     try {
       const url = `${proxy}/adsb?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&radius=${encodeURIComponent(radiusNm)}`;
@@ -243,7 +252,7 @@ export async function fetchAircraftLive(lat, lon, radiusNm, options = {}) {
 export async function fetchWazePolice(bbox, options = {}) {
   const errors = [];
   const target = wazeUrl(bbox);
-  const proxy = (options.proxyBase || "").replace(/\/$/, "");
+  const proxy = resolveProxyBase(options.proxyBase);
   const tries = [];
   if (proxy) tries.push(`${proxy}/waze?top=${bbox.top}&bottom=${bbox.bottom}&left=${bbox.left}&right=${bbox.right}`);
   tries.push(target);
