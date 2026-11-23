@@ -9,12 +9,97 @@ export function resolveProxyBase(proxyBase) {
 }
 
 
+
+/** US Mode S (ICAO24) hex in A00001–ADF7C7 maps to an N-number. Used for OpenSky, which has no registration field. */
+const US_ICAO_BASE = 0xA00001;
+const US_ICAO_MAX = 0xADF7C7;
+const US_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+const US_B1 = 101711;
+const US_B2 = 10111;
+const US_B3 = 951;
+
+function usSuffix(rem) {
+  if (rem === 0) return "";
+  if (rem <= 600) {
+    rem -= 1;
+    let s = US_LETTERS.charAt(Math.floor(rem / 25));
+    if (rem % 25 > 0) s += US_LETTERS.charAt((rem % 25) - 1);
+    return s;
+  }
+  rem -= 601;
+  let s = String(Math.floor(rem / 35));
+  if (rem % 35 > 0) {
+    const base34 = US_LETTERS + "0123456789";
+    s += base34.charAt((rem % 35) - 1);
+  }
+  return s;
+}
+
+export function icaoToNNumber(hex) {
+  const n = parseInt(String(hex || "").trim().replace(/^~/, ""), 16);
+  if (!Number.isFinite(n) || n < US_ICAO_BASE || n > US_ICAO_MAX) return "";
+  let off = n - US_ICAO_BASE;
+  let out = "N" + "123456789".charAt(Math.floor(off / US_B1));
+  let r1 = off % US_B1;
+  if (r1 < 601) return out + usSuffix(r1);
+  const d2 = Math.floor((r1 - 601) / US_B2);
+  out += "0123456789".charAt(d2);
+  const r2 = (r1 - 601) % US_B2;
+  if (r2 < 601) return out + usSuffix(r2);
+  const d3 = Math.floor((r2 - 601) / US_B3);
+  const r3 = (r2 - 601) % US_B3;
+  return out + "0123456789".charAt(d3) + usSuffix(r3);
+}
+
+function metersToFeet(m) {
+  const n = Number(m);
+  return Number.isFinite(n) ? Math.round(n * 3.28084) : m;
+}
+
+function mpsToKnots(mps) {
+  const n = Number(mps);
+  return Number.isFinite(n) ? Math.round(n * 1.94384 * 10) / 10 : mps;
+}
+
+/** Map one OpenSky state-vector array into the ADS-B v2-like object the rest of the app expects. */
+export function parseOpenSkyState(row) {
+  if (!Array.isArray(row) || row.length < 7) return null;
+  if (row[5] == null || row[6] == null) return null;
+  const lat = Number(row[6]);
+  const lon = Number(row[5]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const hex = String(row[0] || "").trim();
+  const onGround = !!row[8];
+  return {
+    hex,
+    flight: String(row[1] || "").trim(),
+    r: icaoToNNumber(hex),
+    t: "",
+    desc: "",
+    ownOp: "",
+    origin_country: row[2] || "",
+    alt_baro: onGround ? "ground" : metersToFeet(row[7]),
+    alt_geom: metersToFeet(row[13]),
+    gs: mpsToKnots(row[9]),
+    track: row[10],
+    squawk: row[14] || "",
+    category: row[17],
+    type: "opensky",
+    lat,
+    lon,
+    on_ground: onGround,
+    raw: row,
+  };
+}
+
 export function parseAdsbResponse(data) {
   if (!data || typeof data !== "object") return [];
   const list = data.ac || data.aircraft || data.states || [];
   if (!Array.isArray(list)) return [];
-  // OpenSky uses states arrays; skip if that's the shape (not currently used).
-  if (list.length && Array.isArray(list[0])) return [];
+  // OpenSky /states/all returns an array of state-vector arrays.
+  if (list.length && Array.isArray(list[0])) {
+    return list.map(parseOpenSkyState).filter(Boolean);
+  }
   return list
     .map((a) => {
       if (!a || typeof a !== "object") return null;

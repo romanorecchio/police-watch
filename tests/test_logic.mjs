@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { haversineMiles, bearingDegrees, isAhead, formatMiles, headingDelta, cardinal, bboxFromPoint } from "../js/geo.js";
 import { buildRegistryIndex, classifyAircraft, updateCircling, ownerLooksLawEnforcement } from "../js/classify.js";
-import { parseAdsbResponse, parseWazeResponse, parseOverpassResponse, DEFAULT_PROXY_BASE, resolveProxyBase } from "../js/sources.js";
+import { parseAdsbResponse, parseWazeResponse, parseOverpassResponse, DEFAULT_PROXY_BASE, resolveProxyBase, icaoToNNumber, parseOpenSkyState } from "../js/sources.js";
 import { evaluateAlerts, markSpoken, DEFAULTS } from "../js/alerts.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -159,4 +159,41 @@ test("built-in proxy URL is used unless Settings overrides it", () => {
   assert.equal(resolveProxyBase(null), DEFAULT_PROXY_BASE);
   assert.equal(resolveProxyBase(undefined), DEFAULT_PROXY_BASE);
   assert.equal(resolveProxyBase("https://custom.example/proxy/"), "https://custom.example/proxy");
+});
+
+test("US ICAO24 hex converts to N-number", () => {
+  assert.equal(icaoToNNumber("ad52c2"), "N958DZ");
+  assert.equal(icaoToNNumber("AC2B80"), "N8831L");
+  assert.equal(icaoToNNumber("A97A71"), "N71HP");
+  assert.equal(icaoToNNumber("ac46f2"), "N890SP");
+  assert.equal(icaoToNNumber("ABF7F8"), "N870ST");
+  assert.equal(icaoToNNumber("a00001"), "N1");
+  assert.equal(icaoToNNumber("adf7c7"), "N99999");
+  assert.equal(icaoToNNumber("A12239"), "N172SP");
+  assert.equal(icaoToNNumber("3c6444"), ""); // not in the US block
+});
+
+test("OpenSky state vectors parse into aircraft with hex and N-number", () => {
+  const sample = {
+    time: 1795432231,
+    states: [
+      ["ad52c2", "DAL1504 ", "United States", 1795432229, 1795432229, -80.3483, 40.2913, 3177.54, false, 140.51, 209.38, 6.83, null, 3169.92, null, false, 0],
+      ["ac2b80", "SWA3543 ", "United States", 1795432230, 1795432230, -80.3707, 40.4992, 1318.26, false, 116.49, 273.54, 15.93, null, 1280.16, null, false, 0],
+      ["dead00", "NODATA  ", "United States", null, null, null, null, null, false, null, null, null, null, null, null, false, 0],
+    ],
+  };
+  const aircraft = parseAdsbResponse(sample);
+  assert.equal(aircraft.length, 2);
+  assert.equal(aircraft[0].hex, "ad52c2");
+  assert.equal(aircraft[0].flight, "DAL1504");
+  assert.equal(aircraft[0].r, "N958DZ");
+  assert.ok(aircraft[0].alt_baro > 10000 && aircraft[0].alt_baro < 11000, aircraft[0].alt_baro); // 3177.54 m ~ 10425 ft
+  assert.equal(aircraft[1].r, "N8831L");
+  const one = parseOpenSkyState(sample.states[0]);
+  assert.equal(one.r, "N958DZ");
+  // hex alone is enough to hit the FAA police list
+  const n71 = { hex: "A97A71", flight: "", r: "", lat: 40.0, lon: -83.0 };
+  const classified = classifyAircraft(n71, index);
+  assert.equal(classified.match, "registry");
+  assert.equal(classified.record.reg, "N71HP");
 });

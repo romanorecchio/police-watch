@@ -44,7 +44,7 @@ Alerts are heading-aware when you are moving, and each target has a cooldown so 
 | Data | Source | Browser notes |
 | --- | --- | --- |
 | Police / LE aircraft list | Public [FAA Releasable Aircraft Database](https://registry.faa.gov/database/ReleasableAircraft.zip), owners matching POLICE, SHERIFF, STATE / HIGHWAY PATROL, STATE POLICE, LAW ENFORCEMENT, PUBLIC SAFETY, plus federal names (CBP, FBI, DHS, etc.) | Bundled as `data/police_aircraft.json` |
-| Live aircraft | [airplanes.live](https://api.airplanes.live/v2/point/{lat}/{lon}/{radius_nm}), then [adsb.lol](https://api.adsb.lol/v2/point/...), then [adsb.fi](https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/{nm}) | **No CORS** from GitHub Pages. Uses the built-in Cloudflare Worker proxy. |
+| Live aircraft | [adsb.lol](https://api.adsb.lol/v2/point/...), then [adsb.fi](https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/{nm}), then [airplanes.live](https://api.airplanes.live/v2/point/{lat}/{lon}/{radius_nm}), then [OpenSky Network](https://opensky-network.org/api/states/all) (`/states/all` bbox; ICAO24 hex mapped to N-number) | **No CORS** from GitHub Pages (OpenSky only allows its own origin). Uses the built-in Cloudflare Worker proxy. As of 23 Nov 2026, all of these still refuse or time out from Cloudflare IPs (see below). |
 | Speed / red-light / Flock ALPR | OpenStreetMap Overpass (`surveillance:type=ALPR`, `highway=speed_camera`, enforcement relations). Same tags DeFlock uses. | **CORS is allowed** (`Access-Control-Allow-Origin: *`). |
 | Waze police reports | Public live-map endpoint `https://www.waze.com/live-map/api/georss?...&types=alerts`, filtered to `type=POLICE`. Polled every 90 seconds, never faster than 60s. | Often **CORS-blocked** and sometimes **403 from datacenter IPs**. Uses the built-in proxy; Waze may still refuse the Worker IP. |
 
@@ -80,7 +80,13 @@ A Cloudflare Worker (free plan, no card) is deployed at:
 
 The app uses that URL by default, so you do not need to paste anything in Settings. You can still override it under **Settings → Proxy URL**. Source for the Worker is in `worker/`.
 
-The Worker adds the CORS headers the app needs. Upstream feeds can still refuse Cloudflare IPs: as of 23 Nov 2026, Waze returned **403** through the Worker, and the ADS-B fallbacks were **403** (airplanes.live, adsb.fi) or **429** (adsb.lol). Camera call-outs do not depend on this proxy.
+The Worker adds the CORS headers the app needs. Upstream feeds can still refuse Cloudflare IPs. As of 23 Nov 2026 (retested ~06:13 EST):
+
+- Waze returned **403** through the Worker.
+- adsb.lol returned **429**, adsb.fi and airplanes.live **403**, api.adsb.one **403**, OpenSky **522** (connection timed out; OpenSky is known to block some hyperscaler IPs). None of these returned aircraft through the Worker.
+- The same morning, OpenSky answered from a non-Cloudflare network with live aircraft near Weirton, and adsb.lol / adsb.fi answered from the box. The phone still cannot call them directly because they send no usable CORS headers. AirLabs does send `Access-Control-Allow-Origin: *` but requires an API key and its free monthly quota is too small for 15-second driving polls.
+
+Camera call-outs do not depend on this proxy.
 
 ## Run it locally (Mac or any computer)
 

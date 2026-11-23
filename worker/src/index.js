@@ -4,27 +4,121 @@
  * after logging in with `npx wrangler login` and `npx wrangler deploy`.
  *
  * Endpoints:
- *   GET /adsb?lat=&lon=&radius=     — airplanes.live, then adsb.lol, then adsb.fi
+ *   GET /adsb?lat=&lon=&radius=     — adsb.lol, adsb.fi, airplanes.live, then OpenSky
  *   GET /waze?top=&bottom=&left=&right=
  *   GET /proxy?url=                 — allow-listed hosts only
  *   GET /health
  */
 const ADSB = [
-  (lat, lon, nm) => `https://api.airplanes.live/v2/point/${lat}/${lon}/${nm}`,
   (lat, lon, nm) => `https://api.adsb.lol/v2/point/${lat}/${lon}/${nm}`,
   (lat, lon, nm) => `https://opendata.adsb.fi/api/v2/lat/${lat}/lon/${lon}/dist/${nm}`,
+  (lat, lon, nm) => `https://api.airplanes.live/v2/point/${lat}/${lon}/${nm}`,
 ];
-const ADSB_NAMES = ["airplanes.live", "adsb.lol", "adsb.fi"];
+const ADSB_NAMES = ["adsb.lol", "adsb.fi", "airplanes.live"];
 const ALLOWED_HOSTS = new Set([
   "api.airplanes.live",
   "api.adsb.lol",
   "opendata.adsb.fi",
+  "api.adsb.one",
+  "opensky-network.org",
   "www.waze.com",
   "overpass-api.de",
   "lz4.overpass-api.de",
   "overpass.osm.ch",
   "overpass.openstreetmap.fr",
 ]);
+
+const US_ICAO_BASE = 0xA00001;
+const US_ICAO_MAX = 0xADF7C7;
+const US_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+const US_B1 = 101711;
+const US_B2 = 10111;
+const US_B3 = 951;
+
+function usSuffix(rem) {
+  if (rem === 0) return "";
+  if (rem <= 600) {
+    rem -= 1;
+    let s = US_LETTERS.charAt(Math.floor(rem / 25));
+    if (rem % 25 > 0) s += US_LETTERS.charAt((rem % 25) - 1);
+    return s;
+  }
+  rem -= 601;
+  let s = String(Math.floor(rem / 35));
+  if (rem % 35 > 0) {
+    const base34 = US_LETTERS + "0123456789";
+    s += base34.charAt((rem % 35) - 1);
+  }
+  return s;
+}
+
+function icaoToNNumber(hex) {
+  const n = parseInt(String(hex || "").trim().replace(/^~/, ""), 16);
+  if (!Number.isFinite(n) || n < US_ICAO_BASE || n > US_ICAO_MAX) return "";
+  let off = n - US_ICAO_BASE;
+  let out = "N" + "123456789".charAt(Math.floor(off / US_B1));
+  let r1 = off % US_B1;
+  if (r1 < 601) return out + usSuffix(r1);
+  const d2 = Math.floor((r1 - 601) / US_B2);
+  out += "0123456789".charAt(d2);
+  const r2 = (r1 - 601) % US_B2;
+  if (r2 < 601) return out + usSuffix(r2);
+  const d3 = Math.floor((r2 - 601) / US_B3);
+  const r3 = (r2 - 601) % US_B3;
+  return out + "0123456789".charAt(d3) + usSuffix(r3);
+}
+
+function metersToFeet(m) {
+  const n = Number(m);
+  return Number.isFinite(n) ? Math.round(n * 3.28084) : null;
+}
+
+function mpsToKnots(mps) {
+  const n = Number(mps);
+  return Number.isFinite(n) ? Math.round(n * 1.94384 * 10) / 10 : null;
+}
+
+function bboxFromPoint(lat, lon, radiusNm) {
+  const nm = Number(radiusNm) || 15;
+  const phi = (Number(lat) * Math.PI) / 180;
+  const dlat = nm / 60;
+  const dlon = nm / (60 * Math.max(Math.cos(phi), 0.01));
+  return {
+    lamin: Number(lat) - dlat,
+    lamax: Number(lat) + dlat,
+    lomin: Number(lon) - dlon,
+    lomax: Number(lon) + dlon,
+  };
+}
+
+function openSkyToAc(data) {
+  const states = Array.isArray(data && data.states) ? data.states : [];
+  const ac = [];
+  for (const row of states) {
+    if (!Array.isArray(row) || row.length < 7) continue;
+    if (row[5] == null || row[6] == null) continue;
+    const lat = Number(row[6]);
+    const lon = Number(row[5]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const hex = String(row[0] || "").trim();
+    const onGround = !!row[8];
+    ac.push({
+      hex,
+      flight: String(row[1] || "").trim(),
+      r: icaoToNNumber(hex),
+      t: "",
+      alt_baro: onGround ? "ground" : metersToFeet(row[7]),
+      alt_geom: metersToFeet(row[13]),
+      gs: mpsToKnots(row[9]),
+      track: row[10],
+      squawk: row[14] || "",
+      category: row[17],
+      lat,
+      lon,
+    });
+  }
+  return ac;
+}
 
 function cors(req, env, extra = {}) {
   const origin = req.headers.get("Origin") || "";
@@ -56,6 +150,10 @@ async function fetchUp(url, headers) {
   return { ok: res.ok, status: res.status, text };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
@@ -76,7 +174,11 @@ export default {
       for (let i = 0; i < ADSB.length; i++) {
         const target = ADSB[i](lat, lon, radius);
         try {
-          const r = await fetchUp(target, { Accept: "application/json", "User-Agent": ua });
+          let r = await fetchUp(target, { Accept: "application/json", "User-Agent": ua });
+          if (r.status === 429 && ADSB_NAMES[i] === "adsb.lol") {
+            await sleep(800);
+            r = await fetchUp(target, { Accept: "application/json", "User-Agent": ua });
+          }
           if (!r.ok) {
             errors.push(`${ADSB_NAMES[i]}: HTTP ${r.status}`);
             continue;
@@ -87,6 +189,19 @@ export default {
         } catch (e) {
           errors.push(`${ADSB_NAMES[i]}: ${e.message}`);
         }
+      }
+      const box = bboxFromPoint(lat, lon, radius);
+      const osUrl = `https://opensky-network.org/api/states/all?lamin=${box.lamin}&lomin=${box.lomin}&lamax=${box.lamax}&lomax=${box.lomax}&extended=1`;
+      try {
+        const r = await fetchUp(osUrl, { Accept: "application/json", "User-Agent": ua });
+        if (!r.ok) {
+          errors.push(`opensky: HTTP ${r.status}`);
+        } else {
+          const raw = JSON.parse(r.text);
+          return json(req, env, { ac: openSkyToAc(raw), _source: "opensky", time: raw.time, errors });
+        }
+      } catch (e) {
+        errors.push(`opensky: ${e.message}`);
       }
       return json(req, env, { error: "all ADS-B sources failed", errors, ac: [] }, 502);
     }
